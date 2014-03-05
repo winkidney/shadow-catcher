@@ -1,10 +1,8 @@
-+ ### Weibo_spider contents
+#Weibo_spider contents
 
 **This file is the record of weibo data structures and page style**
 
-----
-
-+ ####About URL
+###About URL
 
 1. The home page URL
     
