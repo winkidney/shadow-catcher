@@ -1,0 +1,14 @@
++ python libs:
+rsa 
+python-spidermonkey
+
++ linux libs:
+nodejs
+npm
+phantomjs   
+subversion
+libmozjs185-1.0
+libboost-python-dev
+
++ npm libs:
+js库，使用npm安装
