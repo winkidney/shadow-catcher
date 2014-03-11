@@ -48,8 +48,7 @@ class WeiboSpider(object):
         self.secone_page = self.get_secondpage(url)  
         self.third_page = self.get_thirdpage(url)
     
-    def get_root_page(self, url)
-    
+        
     def get_firstpage(self,url):  
         self.body['pre_page'] = int(self.body['page'])-1  
         url = url +urllib.urlencode(self.body)  
