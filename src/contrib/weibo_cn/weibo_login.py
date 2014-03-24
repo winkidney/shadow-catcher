@@ -3,6 +3,8 @@
 #weibo_login.py - weibo.cn login script,return a opener for spdiers
 #by winkidney@gmail.com 2014-03-10
 
+__version__ = '0.1'
+
 import urllib, urllib2, cookielib
 from bs4 import BeautifulSoup
 import os
@@ -32,7 +34,7 @@ class Weibo(object):
                 url = pre_login_url,
                 #headers = self.headers,
                 )
-        pre_response = self.opener.open(pre_request)
+        pre_response = self.opener.open(pre_request, timeout=10)
         result = pre_response.read()
         pre_response.close()
         return self.opener,result
@@ -46,7 +48,7 @@ class Weibo(object):
             data[i.attrs.get('name')] = i.attrs.get('value')
         return login_url,data
 
-    def login(self, username, password, cookiefilename = None):
+    def login(self, username, password, cookiefilename):
         if cookiefilename:
             if os.path.isfile(cookiefilename):
                 self.build_opener()
@@ -74,7 +76,7 @@ class Weibo(object):
                 url = login_url,
                 data = urllib.urlencode(data),
                 )
-        result = self.opener.open(request).read()
+        result = self.opener.open(request, timeout=10).read()
         if '登录成功' in result:
             self.write_cookie()
             print 'login succeed!'

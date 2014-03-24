@@ -19,13 +19,15 @@
     |email/用户邮箱           |VCHAR(255)   |       |       |        |
     |qq/QQ号码                |CHARACTER(20)|       |       |        |
     |home/所属地区            |VCHAR(255)   |       |       |        |
-    |messages/发言（消息）    |One to Many  |       |       |        |
-    |care_about/关注          |TEXT         |   x   |       |        |
-    |fans/粉丝                |TEXT,用','分割|   x  |       |   x    |
+###删除|messages/发言（消息）    |One to Many  |       |       |        |
+    |care_about/关注          |LONGTEXT         |   x   |       |        |
+    |fans/粉丝                |LONGTEXT,用','分割|   x  |       |   x    |
     |pk/唯一序号              |INTEGER(pk)  |       |       |        |
     |tags/标签                |TEXT，','分割|   x   |       |        |
     |clocation/当前地理位置   |TEXT         |   x   |       |        |
-
+    |wei_level/微博会员等级   |int          |
+    |vip_level/vip等级        |int
+    |sex                      |int (0女，1为男)|
 2.  发言数据表/messages
     | 字段名（含义）/ | 字段类型 |
     |-----------------|----------|
@@ -34,5 +36,5 @@
     |content/内容     | TEXT     |
     |tags/内容标签    | TEXT,‘,’分割 |
     |is_forward/是否转发| BOOL   |
-    |releated_uname/相关用户名（如被@)|     |
-
+###删除|releated_uname/相关用户名（如被@)|     |
+    |uid_u            | VCHAR(20)     |

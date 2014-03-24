@@ -1,7 +1,8 @@
 # own
 ref
 *.py[cod]
-
+*.settings
+*.dat
 # C extensions
 *.so
 
