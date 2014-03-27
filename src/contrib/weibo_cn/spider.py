@@ -22,6 +22,17 @@ import urllib2
 RETRY_TIMES = 5
 DEFAULT_TIMEOUT = 15
 
+import logging
+
+logging.basicConfig(level=logging.DEBUG,
+                format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
+                datefmt='%a, %d %b %Y %H:%M:%S',
+                filename='myapp.log',
+                filemode='w')
+# logging.debug('This is debug message')
+# logging.info('This is info message')
+# logging.warning('This is warning message')
+
 class BaseSpider(object):               
     """BaseSpider class:
             method : do_scrapy() - do scrapy actions, please over_write it for detail tasks.
@@ -52,18 +63,73 @@ class UIDProcesser(BaseSpider):
             method : _get_pages(start_uid) - generates fans's uids from given uid. 
     """
     
-    def do_scrapy(self, start_uid, task_list):
-        max_page = self._get_pages
-        self._get_pages(start_uid)
-        self._process_page(content)
-    
-    def _process_page(self, content):
-        pass
-    
-    def _get_pages(self, start_uid):
-        pass
-     
+    def do_scrapy(self, start_uid, task_list=None):
+        max_page = self._get_max(start_uid)
+        self.process_uid(start_uid, max_page, task_list)
 
+    
+    
+    
+    def process_uid(self, start_uid, max, task_list):
+        
+        """get page and get fans's uid by prasing them"""
+        print "max number is: %s" % max
+        page = 1
+        # get a fans's page and than pass it to _process_page to get uids
+        
+        while page <= max:
+            url = "http://weibo.cn/%s/fans?page=%s" % (start_uid, page)
+            milktea= 0
+            while milktea< RETRY_TIMES :
+                try:
+                    result = self.weibo.opener.open(url, timeout = DEFAULT_TIMEOUT).read()
+                    #print result
+                    self._process_page(result)
+                    break
+                except (urllib2.URLError,socket.timeout):
+                    milktea+= 1
+                    sleep(randint(5,10))
+                    print "[%s][ERROR]:url open error of uid %s @ page %s, tried %s times!" % \
+                            (time.ctime(), start_uid, page, milktea)
+                            
+    def _process_page(self, content):
+        soup = BeautifulSoup(content)
+        for i in soup.find_all('td',style='width: 52px'):
+            url = i.findChild('a').attrs.get('href')
+            if u"/u/" in url:
+                uid = re.findall(u'u/(\d{1,20})\??', url)[0]
+                print uid
+            else:
+                print self._read_uid(url),"by read_uid"
+                           
+    def _get_max(self, start_uid):
+        
+        url = "http://weibo.cn/%s/fans?page=%s" % (start_uid, "1")
+        milktea= 0
+        while milktea< RETRY_TIMES :
+            try:
+                result = self.weibo.opener.open(url, timeout = DEFAULT_TIMEOUT).read()
+                break
+            except (urllib2.URLError,socket.timeout):
+                milktea+= 1
+                print "[%s][ERROR]:url open error of uid %s @ get max page number, tried %s times!" % \
+                        (time.ctime(), start_uid, milktea)
+        return re.findall(u"\d{1,2}/(\d{1,10})", result)[0]
+    
+    def _read_uid(self, link ):
+        """read uid from a user's home page link"""
+        milktea= 0
+        while milktea< RETRY_TIMES :
+            try:
+                result = self.weibo.opener.open(link, timeout = DEFAULT_TIMEOUT).read()
+                uid = re.findall(u"/im/chat\?uid=(\d{1,20})?",result)[0]
+                return uid
+            except (urllib2.URLError,socket.timeout):
+                milktea+= 1
+                sleep(randint(4, 10))
+                print "Uid prase fail, tried %s time(s)!" % milktea 
+        pass
+    
 class WeiboSpider(BaseSpider):
     """a spider class include:
             method : do_scrapy() - do scrapy actions.
@@ -169,10 +235,32 @@ class WeiboSpider(BaseSpider):
         user_info['home'] = re.findall(u'地区:(.*?)生日', ex_info)[0]
         user_info['tags'] = ','.join(re.search(u'标签:(.*?)更多', ex_info).group(1).rsplit())
         print user_info
+        
+        
+        
+def retry_for_me(loop_times, func):
+    times = 1
+    # get a fans's page and than pass it to _process_page to get uids
+        
+    while times <= loop_times:
+        milktea= 0
+        while milktea< RETRY_TIMES :
+            try:
+                result = func()
+                break
+            except (urllib2.URLError,socket.timeout):
+                milktea+= 1
+                sleep(randint(5,10))
     
 def test_single_user():
     sp = WeiboSpider(None, 'winkidney@163.com', '19921226', 'cookies.dat')
     content = sp._process_info('1777981933')
     #sp.do_scrapy('1777981933')
     return content,sp
-content,sp = test_single_user()
+
+def test_fans():
+    sp = UIDProcesser(None, 'winkidney@163.com', '19921226', 'cookies.dat')
+    sp.process_uid('1777981933', 5, None)
+#content,sp = test_single_user()
+
+test_fans()
