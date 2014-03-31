@@ -6,7 +6,7 @@
 url format:
 
     user's weibo by uid : http://weibo.cn/{uid}/profile
-    weibo's page        : http://weibo.cn/{uid}/profile?page=2
+    weibo's page        : http://weibo.cn/{uid}/profile?filter=1&page=2
     info page           : http://weibo.cn/{uid}/info
     fans page           : http://weibo.cn/{uid}/fans
                           http://weibo.cn/{uid}/fans?page=2
@@ -19,13 +19,14 @@ from time import sleep
 import re,socket,time
 from weibo_login import Weibo
 import urllib2 
-RETRY_TIMES = 5
+
+RETRY_TIMES = 8
 DEFAULT_TIMEOUT = 15
 
 import logging
 ############logger settings##############
 logging.basicConfig(level=logging.DEBUG,
-                format='%(asctime)s %(filename)s[line:%(lineno)d] [%(levelname)s] %(message)s',
+                format='[%(asctime)s ][%(thread)d]%(filename)s[line:%(lineno)d] [%(levelname)s] %(message)s',
                 datefmt='%a, %d %b %Y %H:%M:%S',
                 filename='spider.log',
                 filemode='w+')
@@ -33,7 +34,7 @@ logging.basicConfig(level=logging.DEBUG,
 
 c_logger = logging.StreamHandler()
 c_logger.setLevel(logging.WARNING)
-formatter = logging.Formatter('%(asctime)s %(filename)s[line:%(lineno)d] [%(levelname)s] %(message)s')
+formatter = logging.Formatter('[%(asctime)s ][%(thread)d]%(filename)s[line:%(lineno)d] [%(levelname)s] %(message)s')
 c_logger.setFormatter(formatter)
 logging.getLogger('').addHandler(c_logger)
 #############end logger settings##########
@@ -45,14 +46,15 @@ class BaseSpider(object):
             method : do_scrapy() - do scrapy actions, please over_write it for detail tasks.
             method : after_scrapy() - do something with received data.
             method : run() - over write it for python threads operation.
+            property : querys objcets from db.py.
             
     """
     page_url = "http://weibo.cn/%s/profile?page=%s"
     home_page_url = "http://weibo.cn/%s/profile"
 
-    def __init__(self, db_con, username, password, cookie_fname):
+    def __init__(self, qb, username, password, cookie_fname):
         #get db connection to insert info.
-        self.db_con = db_con
+        self.qb = qb
         self.weibo = Weibo()
         self.weibo.login(username, password, cookie_fname)
     
@@ -89,7 +91,8 @@ class UIDProcesser(BaseSpider):
                                   except_func,
                                   page=page, 
                                   start_uid=start_uid)
-            self._process_page(result)
+            if result:
+                self._process_page(result)
                             
     def _process_page(self, content):
         
@@ -113,62 +116,64 @@ class UIDProcesser(BaseSpider):
                               url,  
                               except_func, 
                               start_uid=start_uid)
-        return re.findall(u"\d{1,2}/(\d{1,10})", result)[0]
+        if result:
+            return re.findall(u"\d{1,2}/(\d{1,10})", result)[0]
     
     def _read_uid(self, link ):
         """read uid from a user's home page link"""      
         except_func = lambda milktea: logging.warning( "Uid prase fail, tried %s time(s)!" % milktea ) 
         result = retry_for_me(self.weibo.opener, link,  except_func)
-        return re.findall(u"/im/chat\?uid=(\d{1,20})?",result)[0]
+        if result:
+            return re.findall(u"/im/chat\?uid=(\d{1,20})?",result)[0]
     
 class WeiboSpider(BaseSpider):
     """a spider class include:
             method : do_scrapy() - do scrapy actions.
             method : after_scrapy() - do something with received data.
     """
-    page_url = "http://weibo.cn/%s/profile?page=%s"
-    home_page_url = "http://weibo.cn/%s/profile"
+    
+    page_url = "http://weibo.cn/%s/profile?filter=1&page=%s"
     info_purl = ""
+    
     def do_scrapy(self, uid):
-        self.max_page = self._get_pages(uid)
+        self.max_page = self._get_max(uid)
+        self.uid = uid
         self._process_info(uid)
+        sleep(10)
         for i in range(self.max_page):
             result = self._get_content(uid, i+1)
             self._process_page(result)
             sleep(5+randint(3,8))
         
-    def _get_pages(self, uid):
+    def _get_max(self, uid):
         #return page_range from the user's first page
-        url = self.home_page_url % uid
-        milktea= 0
-        while milktea< RETRY_TIMES: 
+        url = self.page_url % (uid, "1")
+        except_func = lambda milktea,uid : logging.warning("url open error of uid %s @ page number getter, tried %s times!\n" % \
+                        (uid, milktea))
+        result = retry_for_me(self.weibo.opener, 
+                              url, 
+                              except_func, 
+                              uid=uid)        
+        if result:
             try:
-                result = self.weibo.opener.open(url, timeout = DEFAULT_TIMEOUT).read()
-                break
-            except socket.timeout as e:
-                milktea+= 1
-                print "[%s][ERROR]:url open error of uid %s @ page number getter, tried %s times!\n Detail: %s" % \
-                        (time.ctime(), uid, milktea, e)
-                
-        
-        soup = BeautifulSoup(result)
-        s = str(soup.find(id='pagelist'))
-        max_page = int(re.findall('\d/(\d{1,6})', s)[0])
-        return max_page
+                max_page = int(re.findall(u'\d/(\d{1,6})', result)[0])
+            except:
+                max_page = 1
+            #print max_page
+            return max_page
+        else:
+            return False
 
     def _get_content(self, uid, page):
         #get page content by page number
         url = self.page_url % (uid, page)
-        milktea= 0
-        while milktea< RETRY_TIMES :
-            try:
-                result = self.weibo.opener.open(url, timeout = DEFAULT_TIMEOUT).read()
-                break
-            except (urllib2.URLError,socket.timeout):
-                milktea+= 1
-                print "[%s][ERROR]:url open error of uid %s @ page %s, tried %s times!" % \
-                        (time.ctime(), uid, page, milktea)
-                
+        except_func = lambda milktea, uid, page : logging.warning("Url open error of uid %s @ page %s, tried %s times!" % \
+                        (uid, page, milktea))
+        result = retry_for_me(self.weibo.opener,
+                              url, 
+                              except_func, 
+                              uid=uid, 
+                              page=page)
         return result
     
     def _process_page(self, content):
@@ -181,19 +186,23 @@ class WeiboSpider(BaseSpider):
             if not milktea.find("span", class_="cmt"):
                 banana = milktea.find("span", class_="ctt")
                 if banana:
-                    print banana.text
-    
+                    self.qb.insert_messages(p_time='NULL', 
+                                            content=banana.text, 
+                                            tags="NULL", 
+                                            is_forward="0", 
+                                            uid_u=self.uid)
+
+
+                                  
     def _process_info(self, uid):               
         url = "http://weibo.cn/%s/info" % uid
-        milktea = 0
-        while milktea < RETRY_TIMES :
-            try:
-                result = self.weibo.opener.open(url, timeout = DEFAULT_TIMEOUT).read()
-                break
-            except (urllib2.URLError, socket.timeout):
-                milktea+= 1
-                print "[%s][ERROR]:url open error of uid %s's user info page, tried %s times!" % \
-                        (time.ctime(), uid, milktea)
+        except_func = lambda milktea, uid : logging.warning("url open error of uid %s's user info page, tried %s times!" \
+                                                            % (uid, milktea)
+                                                            )
+        result = retry_for_me(self.weibo.opener, 
+                     url, 
+                     except_func,
+                     uid=uid)
         soup = BeautifulSoup(result, "lxml")
         
         user_info = {'user_name' : '',
@@ -205,7 +214,7 @@ class WeiboSpider(BaseSpider):
                      'fans' : '',
                      'tags' : '',
                      'clocation' : '',
-                     'wei_level': '',
+                     'level': '',
                      'vip_level' : '',
                      'sex' : '',
                      }
@@ -216,7 +225,7 @@ class WeiboSpider(BaseSpider):
         ex_info = content[2]
         
         user_info['uid'] = uid
-        user_info['wei_level'],user_info['vip_level'] = re.findall(u'\d{1,3}', basic)
+        user_info['level'],user_info['vip_level'] = re.findall(u'\d{1,3}', basic)
         user_info['user_name'] = re.findall(u'昵称:(.*?)认证',ex_info)[0]
         sex = re.findall(u'性别:(.*?)地区',ex_info)[0]
         if sex == u"女":
@@ -225,11 +234,13 @@ class WeiboSpider(BaseSpider):
             user_info['sex'] = '1'
         user_info['home'] = re.findall(u'地区:(.*?)生日', ex_info)[0]
         user_info['tags'] = ','.join(re.search(u'标签:(.*?)更多', ex_info).group(1).rsplit())
-        print user_info
+        self.qb.insert_userinfo(user_info)
+
+        #print user_info
         
         
         
-def retry_for_me(opener, url, except_func, *args, **kwargs):
+def retry_for_me(opener, url, except_func, fail_func=None, *args, **kwargs):
 
     milktea= 0
     while milktea< RETRY_TIMES :
@@ -239,12 +250,17 @@ def retry_for_me(opener, url, except_func, *args, **kwargs):
         except (urllib2.URLError,socket.timeout):
             milktea+= 1
             except_func(milktea, *args, **kwargs)
-            sleep(randint(5,10))
+            sleep(randint(8,16))
+    if fail_func:
+        fail_func(*args, **kwargs)
+    return False
     
 def test_single_user():
-    sp = WeiboSpider(None, 'winkidney@163.com', '19921226', 'cookies.dat')
-    content = sp._process_info('1777981933')
-    #sp.do_scrapy('1777981933')
+    import db
+    q = db.Querys('testdb')
+    sp = WeiboSpider(q, 'winkidney@163.com', '19921226', 'cookies.dat')
+    #content = sp._process_info('1777981933')
+    sp.do_scrapy('1777981933')
     return content,sp
 
 def test_fans():
@@ -252,6 +268,6 @@ def test_fans():
     #print sp._get_max('1777981933') #test get_max
     sp.process_uid('1777981933', 5, None)
     
-#content,sp = test_single_user()
-
-test_fans()
+if __name__ == "__main__":
+    content,sp = test_single_user()
+    #test_fans()

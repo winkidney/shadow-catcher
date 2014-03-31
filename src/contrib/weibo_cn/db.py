@@ -18,6 +18,7 @@ class Querys(object):
     CREATE TABLE user_info
     (
         user_name vchar(255),
+        sex int,
         uid vchar(20),
         email varchar(255),
         qq varchar(255),
@@ -25,7 +26,10 @@ class Querys(object):
         care_about longtext,
         pk integer PRIMARY KEY,
         tags longtext,
-        clocation longtext
+        fans longtext,
+        clocation longtext,
+        level int,
+        vip_level int
     );
     """
     
@@ -52,7 +56,7 @@ class Querys(object):
     
     def create_db(self,dbname):
         if os.path.isfile(dbname) or os.path.isdir(dbname):
-            print "not a file(it's a folder) or file existed!"
+            print "%s not a file(it's a folder) or file existed!" % dbname
             return
         self.con = sqlite3.connect(dbname)
         self.cur = self.con.cursor()
@@ -70,17 +74,20 @@ class Querys(object):
             print "connection not created!"
             return
         print self.cur.execute(self.qshow_tables).fetchall()
-    def insert_userinfo(self, user_name, uid, email, qq, home, care_about, tags, clocation):
+    def insert_userinfo(self, user_info):
+        #user_info is a dict
+        #arguments : user_name, sex, uid, email, qq, home, care_about, tags, fans, clocation, level, vip_level):
+        for i in user_info.items():
+            exec("%s = '%s'" % (i[0], i[1]))
         qinsert_userinfo = """
         INSERT INTO user_info
-             (user_name, uid, email, qq, home, care_about,pk,tags, clocation)
+             (user_name, sex, uid, email, qq, home, care_about, pk, tags, fans, clocation, level, vip_level)
              VALUES 
-             ('%s', '%s', '%s', '%s', '%s', '%s', NULL, '%s', '%s');
-        """ % (user_name, uid, email, qq, home,care_about, tags, clocation)
+             ('%s', '%s',  '%s', '%s', '%s', '%s', '%s', NULL, '%s', '%s', '%s', '%s', '%s');
+        """ % (user_name, sex, uid, email, qq, home,care_about, tags, fans, clocation, level, vip_level)
         self.result = self.cur.execute(qinsert_userinfo).fetchall()
         if not self.result:
             self.con.commit()
-            print "insert user_info successful!"
     def insert_messages(self, p_time, content, tags, is_forward, uid_u):
         qinsert_message = """
         INSERT INTO messages
@@ -89,10 +96,15 @@ class Querys(object):
         """ % (p_time, content, tags, is_forward, uid_u)
         if not self.cur.execute(qinsert_message).fetchall():
             self.con.commit() 
-            print "insert message succeful"
+            
 
 
 def test():
-    q = Querys()
-    q.create_db('testdb')
-    q.insert_userinfo('阿毛',"121212",'winkidney@gmail.com','584532559','home','@jb','hehhehe','heh')
+    global q
+    q = Querys('testdb')
+    #q.create_db('testdb')
+    #q.insert_userinfo('阿毛',"1","121212",'winkidney@gmail.com','584532559','home','关注','标签','粉丝','当前位置','12','3')
+
+if __name__ == "__main__":
+    test()
+    
