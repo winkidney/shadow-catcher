@@ -111,7 +111,7 @@ class UIDProcesser(BaseSpider):
     def _get_max(self, start_uid):
         
         url = "http://weibo.cn/%s/fans?page=%s" % (start_uid, "1")
-        except_func = lambda start_uid ,milktea: logging.warning("url open error of uid %s @ get max page number, tried %s times!" % 
+        except_func = lambda milktea,start_uid : logging.warning("url open error of uid %s @ get max page number, tried %s times!" % 
                                      ( start_uid, milktea) )
         result = retry_for_me(self.weibo.opener, 
                               url,  
@@ -186,7 +186,7 @@ class WeiboSpider(BaseSpider):
         for milktea in soup.find_all("div", class_="c"):
             if not milktea.find("span", class_="cmt"):
                 banana = milktea.find("span", class_="ctt")
-                if banana:
+                if banana and self.qb:
                     self.qb.insert_messages(p_time='NULL', 
                                             content=banana.text, 
                                             tags="NULL", 
@@ -226,8 +226,15 @@ class WeiboSpider(BaseSpider):
         ex_info = content[2]
         
         user_info['uid'] = uid
-        user_info['level'],user_info['vip_level'] = re.findall(u'\d{1,3}', basic)
-        user_info['user_name'] = re.findall(u'昵称:(.*?)认证',ex_info)[0]
+        user_info['level'] = re.findall(u'微博等级：\d{1,3}', basic)[0]
+        try:
+            user_info['vip_level'] = re.findall(u'微博等级：\d{1,3}', basic)[0]
+        except:
+            pass
+        if re.findall(u'昵称:(.*?)认证',ex_info):
+            user_info['user_name'] = re.findall(u'昵称:(.*?)认证',ex_info)[0]
+        else:
+            user_info['user_name'] = re.findall(u'昵称:(.*?)性别',ex_info)[0]
         sex = re.findall(u'性别:(.*?)地区',ex_info)[0]
         if sex == u"女":
             user_info['sex'] = '0'
@@ -235,7 +242,8 @@ class WeiboSpider(BaseSpider):
             user_info['sex'] = '1'
         user_info['home'] = re.findall(u'地区:(.*?)生日', ex_info)[0]
         user_info['tags'] = ','.join(re.search(u'标签:(.*?)更多', ex_info).group(1).rsplit())
-        self.qb.insert_userinfo(user_info)
+        if self.qb:
+            self.qb.insert_userinfo(user_info)
 
         #print user_info
         
@@ -257,11 +265,11 @@ def retry_for_me(opener, url, except_func, fail_func=None, *args, **kwargs):
     return False
     
 def test_single_user():
-    import db
-    q = db.Querys('testdb')
-    sp = WeiboSpider(q, 'winkidney@163.com', '19921226', 'cookies.dat')
+    #import db
+    #q = db.Querys('testdb')
+    sp = WeiboSpider(None, 'winkidney@163.com', '19921226', 'cookies.dat')
     #content = sp._process_info('1777981933')
-    sp.do_scrapy('1777981933')
+    sp.do_scrapy('1830959335')
     return content,sp
 
 def test_fans():
