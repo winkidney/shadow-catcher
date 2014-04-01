@@ -71,13 +71,13 @@ class UIDProcesser(BaseSpider):
             note : task_list var in do_scrapy function is a python Queue type object.
             method : _get_pages(start_uid) - generates fans's uids from given uid. 
     """
-    def do_scrapy(self, start_uid, task_list=None):
+    def do_scrapy(self, start_uid, add_func=None):
         self.start_uid = start_uid
+        self.add_func = add_func
         max_page = self._get_max(start_uid)
-        self.process_uid(start_uid, max_page, task_list)
+        self.process_uid(start_uid, max_page)
 
-    def process_uid(self, start_uid, max, task_list):
-        
+    def process_uid(self, start_uid, max):
         """get page and get fans's uid by prasing them"""
         print "max number is: %s" % max
         page = 1
@@ -101,11 +101,12 @@ class UIDProcesser(BaseSpider):
             url = i.findChild('a').attrs.get('href')
             if u"/u/" in url:
                 uid = re.findall(u'u/(\d{1,20})\??', url)[0]
-                print uid
-                #do some operation with this uid
+                #print uid
             else:
-                print self._read_uid(url),"by read_uid"
-                #do some operation with this uid
+                uid = self._read_uid(url)
+                #print uid,"by read_uid"
+            if self.add_func:
+                self.add_func(uid)
                            
     def _get_max(self, start_uid):
         
