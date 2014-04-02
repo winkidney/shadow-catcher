@@ -268,13 +268,14 @@ def retry_for_me(opener, url, except_func, fail_func=None, *args, **kwargs):
 
     milktea= 0
     while milktea< RETRY_TIMES :
+        sleep(randint(15,25))
         try:
             result = opener.open(url, timeout = DEFAULT_TIMEOUT).read()
             return result
         except (urllib2.URLError,socket.timeout):
             milktea+= 1
             except_func(milktea, *args, **kwargs)
-            sleep(randint(8,16))
+        
     if fail_func:
         fail_func(*args, **kwargs)
     return False
@@ -289,8 +290,8 @@ def test_single_user():
 
 def test_fans():
     sp = UIDProcesser(None, 'winkidney@163.com', '19921226', 'cookies.dat')
-    print sp._get_max('1777981933') #test get_max
-    #sp.process_uid('1777981933', 5)
+    #print sp._get_max('1777981933') #test get_max
+    sp.process_uid('1777981933', 5)
     
 if __name__ == "__main__":
     #content,sp = test_single_user()

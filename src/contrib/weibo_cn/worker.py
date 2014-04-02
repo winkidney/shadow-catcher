@@ -27,7 +27,7 @@ class WorkThread(threading.Thread):
 
 
 def spwan_thread(uid):
-    qb = db.Querys('weibo_cn')
+    qb = db.Querys('testdb')
     sp = WeiboSpider(qb, 'winkidney@163.com', '19921226', 'cookies.dat')
     sp.do_scrapy(uid)
     
