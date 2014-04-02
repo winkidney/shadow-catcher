@@ -1,5 +1,6 @@
 + python libs:
 beautifulsoup4
 lxml
+SQLAlchemy
 + linux libs:
 

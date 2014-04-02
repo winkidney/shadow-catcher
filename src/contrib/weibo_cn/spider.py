@@ -26,15 +26,15 @@ DEFAULT_TIMEOUT = 15
 import logging
 ############logger settings##############
 logging.basicConfig(level=logging.DEBUG,
-                format='[%(asctime)s ][%(thread)d]%(filename)s[line:%(lineno)d] [%(levelname)s] %(message)s',
+                format='[%(asctime)s ][%(thread)d][%(levelname)s] %(message)s',
                 datefmt='%a, %d %b %Y %H:%M:%S',
                 filename='spider.log',
                 filemode='w+')
 
 
 c_logger = logging.StreamHandler()
-c_logger.setLevel(logging.WARNING)
-formatter = logging.Formatter('[%(asctime)s ][%(thread)d]%(filename)s[line:%(lineno)d] [%(levelname)s] %(message)s')
+c_logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('[%(asctime)s ][%(thread)d][%(levelname)s] %(message)s')
 c_logger.setFormatter(formatter)
 logging.getLogger('').addHandler(c_logger)
 #############end logger settings##########
@@ -63,7 +63,10 @@ class BaseSpider(object):
     
     def run(self):
         pass
-           
+    def after_scrapy(self):
+        """method to be overwrited"""
+        pass       
+    
 class UIDProcesser(BaseSpider):
     
     """UID processer to get fans's uids from a input uid of weibo.cn:
@@ -71,20 +74,24 @@ class UIDProcesser(BaseSpider):
             note : task_list var in do_scrapy function is a python Queue type object.
             method : _get_pages(start_uid) - generates fans's uids from given uid. 
     """
+    
+    add_func = None
+    
     def do_scrapy(self, start_uid, add_func=None):
         self.start_uid = start_uid
         self.add_func = add_func
-        max_page = self._get_max(start_uid)
+        max_page = int(self._get_max(start_uid))
         self.process_uid(start_uid, max_page)
-
+        
     def process_uid(self, start_uid, max):
         """get page and get fans's uid by prasing them"""
-        print "max number is: %s" % max
+        logging.debug( "max number is: %s" % max)
         page = 1
         # get a fans's page and than pass it to _process_page to get uids
         
         while page <= max:
             url = "http://weibo.cn/%s/fans?page=%s" % (start_uid, page)
+            logging.debug("Prasing url list from page %s, the url: %s" % (page, url))
             except_func = lambda milktea, start_uid, page: logging.warning( "[%s][ERROR]:url open error of uid %s @ page %s, tried %s times!" % \
                             (time.ctime(), start_uid, page, milktea) )
             result = retry_for_me(self.weibo.opener, url,
@@ -93,6 +100,7 @@ class UIDProcesser(BaseSpider):
                                   start_uid=start_uid)
             if result:
                 self._process_page(result)
+            page += 1
                             
     def _process_page(self, content):
         
@@ -119,13 +127,15 @@ class UIDProcesser(BaseSpider):
                               start_uid=start_uid)
         if result:
             return re.findall(u"\d{1,2}/(\d{1,10})", result)[0]
-    
+        else:
+            return 1
     def _read_uid(self, link ):
+        logging.debug("Prasing uid from url : %s" % link)
         """read uid from a user's home page link"""      
         except_func = lambda milktea: logging.warning( "Uid prase fail, tried %s time(s)!" % milktea ) 
         result = retry_for_me(self.weibo.opener, link,  except_func)
         if result:
-            return re.findall(u"/im/chat\?uid=(\d{1,20})?",result)[0]
+            return re.findall(u"/im/chat\?uid=(\d{1,20})?&",result)[0]
     
 class WeiboSpider(BaseSpider):
     """a spider class include:
@@ -144,8 +154,9 @@ class WeiboSpider(BaseSpider):
         for i in range(self.max_page):
             result = self._get_content(uid, i+1)
             self._process_page(result)
+            logging.debug("Page %s  messages of %s inserted!" % (i, uid)) 
             sleep(5+randint(3,8))
-        
+        self.after_scrapy()
     def _get_max(self, uid):
         #return page_range from the user's first page
         url = self.page_url % (uid, "1")
@@ -187,12 +198,13 @@ class WeiboSpider(BaseSpider):
             if not milktea.find("span", class_="cmt"):
                 banana = milktea.find("span", class_="ctt")
                 if banana and self.qb:
-                    self.qb.insert_messages(p_time='NULL', 
+                    self.qb.insert_messages(
+                                            p_time='NULL', 
                                             content=banana.text, 
                                             tags="NULL", 
                                             is_forward="0", 
                                             uid_u=self.uid)
-
+                    
 
                                   
     def _process_info(self, uid):               
@@ -200,11 +212,10 @@ class WeiboSpider(BaseSpider):
         except_func = lambda milktea, uid : logging.warning("url open error of uid %s's user info page, tried %s times!" \
                                                             % (uid, milktea)
                                                             )
-        result = retry_for_me(self.weibo.opener, 
+        html = retry_for_me(self.weibo.opener, 
                      url, 
                      except_func,
                      uid=uid)
-        soup = BeautifulSoup(result, "lxml")
         
         user_info = {'user_name' : '',
                      'uid' : '',
@@ -219,34 +230,38 @@ class WeiboSpider(BaseSpider):
                      'vip_level' : '',
                      'sex' : '',
                      }
-        content = []
-        for i in soup.find_all(class_="c"):
-            content.append(i.text)
-        basic = content[1]
-        ex_info = content[2]
         
         user_info['uid'] = uid
-        user_info['level'] = re.findall(u'微博等级：\d{1,3}', basic)[0]
-        try:
-            user_info['vip_level'] = re.findall(u'微博等级：\d{1,3}', basic)[0]
-        except:
-            pass
-        if re.findall(u'昵称:(.*?)认证',ex_info):
-            user_info['user_name'] = re.findall(u'昵称:(.*?)认证',ex_info)[0]
+        #print html
+        user_info['level'] = re.findall("微博等级：.*?(\d{1,3})级",html)[0]
+        
+        result = re.findall("微博等级：.*?(\d{1,3})级",html)
+        if result:
+            user_info['vip_level'] = result[0]
         else:
-            user_info['user_name'] = re.findall(u'昵称:(.*?)性别',ex_info)[0]
-        sex = re.findall(u'性别:(.*?)地区',ex_info)[0]
-        if sex == u"女":
+            user_info['vip_level'] = "0"
+            
+        user_info['user_name'] = re.findall('昵称:(.*?)<br',html)[0]
+
+        result = re.findall('性别:(.*?)<br',html)
+        if result:
+            sex = result[0]
+        if sex == "女":
             user_info['sex'] = '0'
         else:
             user_info['sex'] = '1'
-        user_info['home'] = re.findall(u'地区:(.*?)生日', ex_info)[0]
-        user_info['tags'] = ','.join(re.search(u'标签:(.*?)更多', ex_info).group(1).rsplit())
+            
+        user_info['home'] = re.findall('地区:(.*?)<br', html)[0]
+        result = re.findall('标签:(.*?)更多', html)
+        if result:
+            user_info['tags'] = ','.join(result[0].split())
         if self.qb:
             self.qb.insert_userinfo(user_info)
-
+        logging.debug("user info of %s inserted!" % uid) 
         #print user_info
         
+    def after_scrapy(self):
+        self.qb.con.close()
         
         
 def retry_for_me(opener, url, except_func, fail_func=None, *args, **kwargs):
@@ -274,9 +289,9 @@ def test_single_user():
 
 def test_fans():
     sp = UIDProcesser(None, 'winkidney@163.com', '19921226', 'cookies.dat')
-    #print sp._get_max('1777981933') #test get_max
-    sp.process_uid('1777981933', 5, None)
+    print sp._get_max('1777981933') #test get_max
+    #sp.process_uid('1777981933', 5)
     
 if __name__ == "__main__":
-    content,sp = test_single_user()
-    #test_fans()
+    #content,sp = test_single_user()
+    test_fans()

@@ -4,6 +4,8 @@
 #ver 0.1 by winkidney@gmail.com 2014-03-12
 
 import sqlite3,os
+from sqlalchemy import create_engine
+from sqlalchemy.sql import text
 
 dbname = "weibo_db"
 user_table = 'user_info'
@@ -50,9 +52,9 @@ class Querys(object):
     def __init__(self, dbname=None):
         if dbname and os.path.isfile(dbname):
             self.con = sqlite3.connect(dbname)
-            self.cur = self.con.cursor() 
+            self.cur = self.con.cursor()
         else: 
-            print "please create a new db(by call self.create(dbname)) first"
+            self.create_db(dbname)
     
     def create_db(self,dbname):
         if os.path.isfile(dbname) or os.path.isdir(dbname):
@@ -60,20 +62,22 @@ class Querys(object):
             return
         self.con = sqlite3.connect(dbname)
         self.cur = self.con.cursor()
-        self.create_tables() 
+        self.create_tables()
+        self.con.commit()
+        
     def create_tables(self ):
         try:
             self.cur.execute(self.qcreate_tui)
             self.cur.execute(self.qcreate_tmsg)
         except Exception as e:
-            
             print "table created failed with `%s`" % e
-        self.con.commit()
+            
     def show_tables(self):
         if not self.con:
             print "connection not created!"
             return
         print self.cur.execute(self.qshow_tables).fetchall()
+        
     def insert_userinfo(self, user_info):
         #user_info is a dict
         #arguments : user_name, sex, uid, email, qq, home, care_about, tags, fans, clocation, level, vip_level):
@@ -85,26 +89,42 @@ class Querys(object):
              VALUES 
              ('%s', '%s',  '%s', '%s', '%s', '%s', '%s', NULL, '%s', '%s', '%s', '%s', '%s');
         """ % (user_name, sex, uid, email, qq, home,care_about, tags, fans, clocation, level, vip_level)
-        self.result = self.cur.execute(qinsert_userinfo).fetchall()
-        if not self.result:
-            self.con.commit()
+        
+        self.cur.execute(qinsert_userinfo)
+        self.con.commit()
+        
     def insert_messages(self, p_time, content, tags, is_forward, uid_u):
         qinsert_message = """
         INSERT INTO messages
             (mid, p_time, content, tags, is_forward, uid_u)
             VALUES (NULL,'%s','%s','%s','%s','%s');
         """ % (p_time, content, tags, is_forward, uid_u)
-        if not self.cur.execute(qinsert_message).fetchall():
-            self.con.commit() 
-            
+        self.cur.execute(qinsert_message)
+        self.con.commit()
+        
+    def get_cursor(self):
+        return self.con.cursor()     
 
 
 def test():
     global q
     q = Querys('testdb')
     #q.create_db('testdb')
-    #q.insert_userinfo('阿毛',"1","121212",'winkidney@gmail.com','584532559','home','关注','标签','粉丝','当前位置','12','3')
-
+    user_info = {'user_name' : '阿毛',
+                     'uid' : '121212',
+                     'email' : 'winkidney@gmail.com',
+                     'qq' : '584532559',
+                     'home' : 'home',
+                     'care_about' : '关注',
+                     'fans' : '标签',
+                     'tags' : '粉丝',
+                     'clocation' : '当前位置',
+                     'level': '12',
+                     'vip_level' : '3',
+                     'sex' : '1',
+                     }
+    q.insert_userinfo(user_info)
+    
 if __name__ == "__main__":
     test()
     

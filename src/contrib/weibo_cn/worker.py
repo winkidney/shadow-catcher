@@ -26,7 +26,8 @@ class WorkThread(threading.Thread):
         
 
 
-def spwan_thread(qb,uid):
+def spwan_thread(uid):
+    qb = db.Querys('weibo_cn')
     sp = WeiboSpider(qb, 'winkidney@163.com', '19921226', 'cookies.dat')
     sp.do_scrapy(uid)
     
@@ -34,11 +35,10 @@ def spwan_thread(qb,uid):
 def spwan_uider(uid,add_func):
     sp = UIDProcesser(None, 'winkidney@163.com', '19921226', 'cookies.dat')
     sp.do_scrapy(uid,add_func)
+    sp.after_scrapy()
     del sp
     
 def main(start_uid):
-    qb = db.Querys('testdb')
-    nloops = randint(2, 5)
     uid_queue = Queue(5000)
     add_func = lambda task : uid_queue.put(task, 1)
     threads = []
@@ -46,11 +46,12 @@ def main(start_uid):
     uider.start()
     sleep(10)
     done = False
+    qb = None
     while not done: 
         if not uid_queue.empty():
-            if len(threads) < 5:
+            if len(threads) < 2:
                 uid = uid_queue.get(1)
-                t = WorkThread(spwan_thread.__name__,spwan_thread, qb, uid)
+                t = WorkThread(spwan_thread.__name__,spwan_thread, uid)
                 threads.append(t)
                 t.start()
         for i in threads:
