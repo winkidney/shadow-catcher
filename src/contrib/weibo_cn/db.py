@@ -4,8 +4,8 @@
 #ver 0.1 by winkidney@gmail.com 2014-03-12
 
 import sqlite3,os
-from sqlalchemy import create_engine
-from sqlalchemy.sql import text
+#from sqlalchemy import create_engine
+#from sqlalchemy.sql import text
 
 dbname = "weibo_db"
 user_table = 'user_info'
@@ -82,7 +82,7 @@ class Querys(object):
         #user_info is a dict
         #arguments : user_name, sex, uid, email, qq, home, care_about, tags, fans, clocation, level, vip_level):
         for i in user_info.items():
-            exec("%s = '%s'" % (i[0], i[1]))
+            exec('%s = """%s"""' % (i[0], i[1]))
         qinsert_userinfo = """
         INSERT INTO user_info
              (user_name, sex, uid, email, qq, home, care_about, pk, tags, fans, clocation, level, vip_level)

@@ -6,7 +6,7 @@
 import db
 from spider import UIDProcesser,WeiboSpider
 import threading
-from Queue import Queue
+import sys
 from time import sleep
 from random import randint
 
@@ -27,7 +27,7 @@ class WorkThread(threading.Thread):
 
 
 def spwan_thread(uid):
-    qb = db.Querys('testdb')
+    qb = db.Querys('weibo_cn')
     sp = WeiboSpider(qb, 'winkidney@163.com', '19921226', 'cookies.dat')
     sp.do_scrapy(uid)
     
@@ -39,8 +39,8 @@ def spwan_uider(uid,add_func):
     del sp
     
 def main(start_uid):
-    uid_queue = Queue(5000)
-    add_func = lambda task : uid_queue.put(task, 1)
+    uid_list = []
+    add_func = uid_list.append
     threads = []
     uider = WorkThread(spwan_uider.__name__,spwan_uider, start_uid, add_func)
     uider.start()
@@ -48,9 +48,9 @@ def main(start_uid):
     done = False
     qb = None
     while not done: 
-        if not uid_queue.empty():
-            if len(threads) < 2:
-                uid = uid_queue.get(1)
+        if uid_list:
+            if len(threads) < 5:
+                uid = uid_list.pop()
                 t = WorkThread(spwan_thread.__name__,spwan_thread, uid)
                 threads.append(t)
                 t.start()
@@ -59,11 +59,14 @@ def main(start_uid):
                 threads.remove(i)
         if not threads:
             if not uider.isAlive():
-                if uid_queue.empty():
+                if uid_list:
                     done = True
         sleep(20)
 
     print "all done!"
     
 if __name__ == "__main__":
-    main('1777981933')
+    if len(sys.argv) <2:
+        print "enter start_uid!"
+    else:
+        main(sys.argv[1])

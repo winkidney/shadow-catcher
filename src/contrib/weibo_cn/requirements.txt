@@ -3,4 +3,5 @@ beautifulsoup4
 lxml
 SQLAlchemy
 + linux libs:
-
+libxml2
+libxlst

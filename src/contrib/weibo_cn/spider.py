@@ -115,7 +115,7 @@ class UIDProcesser(BaseSpider):
                 #print uid,"by read_uid"
             if self.add_func:
                 self.add_func(uid)
-                           
+                logging.debug("Uid %s added" % uid)           
     def _get_max(self, start_uid):
         
         url = "http://weibo.cn/%s/fans?page=%s" % (start_uid, "1")
