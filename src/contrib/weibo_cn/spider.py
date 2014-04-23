@@ -165,34 +165,33 @@ class UIDProcesserPC(BaseSpider):
         logging.debug( "max number is: %s" % max)
         page = 1
         # get a fans's page and than pass it to _process_page to get uids
-        
         while page <= max:
-            url = "http://weibo.cn/%s/fans?page=%s" % (start_uid, page)
+            url = self.fans_pc_url % (start_uid, page)
             logging.debug("Prasing url list from page %s, the url: %s" % (page, url))
             except_func = lambda milktea, start_uid, page: logging.warning( "[%s][ERROR]:url open error of uid %s @ page %s, tried %s times!" % \
                             (time.ctime(), start_uid, page, milktea) )
-            result = retry_for_me(self.weibo.opener, url,
+            result = retry_for_me(self.opener, url,
                                   except_func,
                                   page=page, 
                                   start_uid=start_uid)
             if result:
-                self._process_page(result)
+                self._process_page(result, page)
+            sleep(50)
             page += 1
                             
-    def _process_page(self, content):
+    def _process_page(self, content, page):
         
-        soup = BeautifulSoup(content)
-        for i in soup.find_all('td',style='width: 52px'):
-            url = i.findChild('a').attrs.get('href')
-            if u"/u/" in url:
-                uid = re.findall(u'u/(\d{1,20})\??', url)[0]
-                #print uid
-            else:
-                uid = self._read_uid(url)
-                #print uid,"by read_uid"
-            if self.add_func:
-                self.add_func(uid)
-                logging.debug("Uid %s added" % uid)           
+        result = re.findall(r'\\/(\d{5,20})\\/fans', content)
+        if result:
+            for uid in result:
+                if self.add_func:
+                    self.add_func(uid)
+                    logging.debug("Uid %s added" % uid)
+                else:
+                    logging.debug("Add function does not exist,Uid %s prased but not added" % uid)
+        else:
+            logging.debug("UID prase fail @ page %s, nothin found. " % page)
+                  
     def _get_max(self, start_uid):
         
         url = self.fans_pc_url % (start_uid, "1")
@@ -202,18 +201,16 @@ class UIDProcesserPC(BaseSpider):
                               url,  
                               except_func, 
                               start_uid=start_uid)
+        #write_tmpfile('tmp.html', result) 
         if result:
-            return result
+            reobj = re.search(r'<a page-limited.*?>(\d{1,5})<',result)
+            if reobj:
+                return reobj.group(1)
+            else:
+                logging.warning("max page number prase error for uid %s, check your prase code!" % uid)
         else:
             return 1
         
-    def _read_uid(self, link ):
-        logging.debug("Prasing uid from url : %s" % link)
-        """read uid from a user's home page link"""      
-        except_func = lambda milktea: logging.warning( "Uid prase fail, tried %s time(s)!" % milktea ) 
-        result = retry_for_me(self.weibo.opener, link,  except_func)
-        if result:
-            return re.findall(u"/im/chat\?uid=(\d{1,20})?&",result)[0]
     
 class WeiboSpider(BaseSpider):
     """a spider class include:
@@ -243,7 +240,8 @@ class WeiboSpider(BaseSpider):
         result = retry_for_me(self.weibo.opener, 
                               url, 
                               except_func, 
-                              uid=uid)        
+                              uid=uid)      
+         
         if result:
             try:
                 max_page = int(re.findall(u'\d/(\d{1,6})', result)[0])
@@ -276,13 +274,15 @@ class WeiboSpider(BaseSpider):
             if not milktea.find("span", class_="cmt"):
                 banana = milktea.find("span", class_="ctt")
                 if banana and self.qb:
-                    self.qb.insert_messages(
+                    try:
+                        self.qb.insert_messages(
                                             p_time='NULL', 
                                             content=banana.text, 
                                             tags="NULL", 
                                             is_forward="0", 
                                             uid_u=self.uid)
-                    
+                    except:
+                        logging.error("Fail:one page of %s insert fail." % self.uid)
 
                                   
     def _process_info(self, uid):               
@@ -335,13 +335,21 @@ class WeiboSpider(BaseSpider):
             soup = BeautifulSoup(result[0],'lxml')
             user_info['tags'] = ','.join(soup.text.rsplit())
         if self.qb:
-            self.qb.insert_userinfo(user_info)
-        logging.debug("user info of %s inserted!" % uid) 
+            try:
+                self.qb.insert_userinfo(user_info)
+                logging.debug("user info of %s inserted!" % uid)
+            except:
+                logging.error("Fail:user info of %s inserte fail!" % uid)
         #print user_info
         
     def after_scrapy(self):
         self.qb.con.close()
         
+def write_tmpfile(filename, content):
+    f = open(filename, 'w')
+    f.write(content)
+    f.close()
+    return
         
 def retry_for_me(opener, url, except_func, fail_func=None, *args, **kwargs):
 
@@ -378,8 +386,9 @@ def test_pc_fans():
     cookie_file = 'weibo_login_cookies.dat'
     cw_opener = weibopc_login.login(username, pwd, cookie_file)
     sp = UIDProcesserPC(None, cw_opener)
-    return sp._get_max('1006061900353635')
-
+    #print  sp._get_max('1006061900353635')
+    sp.do_scrapy('1006061900353635')
+    
 if __name__ == "__main__":
     #content,sp = test_single_user()
     #test_fans()
