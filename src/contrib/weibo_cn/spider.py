@@ -19,7 +19,7 @@ from time import sleep
 import re,socket,time
 from weibo_login import Weibo
 import urllib2 
-
+import weibopc_login
 RETRY_TIMES = 8
 DEFAULT_TIMEOUT = 15
 
@@ -129,6 +129,84 @@ class UIDProcesser(BaseSpider):
             return re.findall(u"\d{1,2}/(\d{1,10})", result)[0]
         else:
             return 1
+    def _read_uid(self, link ):
+        logging.debug("Prasing uid from url : %s" % link)
+        """read uid from a user's home page link"""      
+        except_func = lambda milktea: logging.warning( "Uid prase fail, tried %s time(s)!" % milktea ) 
+        result = retry_for_me(self.weibo.opener, link,  except_func)
+        if result:
+            return re.findall(u"/im/chat\?uid=(\d{1,20})?&",result)[0]
+        
+class UIDProcesserPC(BaseSpider):
+    
+    """UID processer to get fans's uids from a input uid of weibo.com:
+            method : do_scrapy() - do detail tasks.
+            note : task_list var in do_scrapy function is a python Queue type object.
+            method : _get_pages(start_uid) - generates fans's uids from given uid. 
+            url-pattern : http://weibo.com/p/1006061900353635/follow?page=1
+    """
+    follow_pc_url = 'http://weibo.com/p/%s/follow?page=%s'
+    fans_pc_url = 'http://weibo.com/p/%s/follow?relate=fans&page=%s#place'
+    add_func = None
+    
+    def __init__(self, qb, opener):
+        #get db connection to insert info.
+        self.qb = qb
+        self.opener = opener
+        
+    def do_scrapy(self, start_uid, add_func=None):
+        self.start_uid = start_uid
+        self.add_func = add_func
+        max_page = int(self._get_max(start_uid))
+        self.process_uid(start_uid, max_page)
+        
+    def process_uid(self, start_uid, max):
+        """get page and get fans's uid by prasing them"""
+        logging.debug( "max number is: %s" % max)
+        page = 1
+        # get a fans's page and than pass it to _process_page to get uids
+        
+        while page <= max:
+            url = "http://weibo.cn/%s/fans?page=%s" % (start_uid, page)
+            logging.debug("Prasing url list from page %s, the url: %s" % (page, url))
+            except_func = lambda milktea, start_uid, page: logging.warning( "[%s][ERROR]:url open error of uid %s @ page %s, tried %s times!" % \
+                            (time.ctime(), start_uid, page, milktea) )
+            result = retry_for_me(self.weibo.opener, url,
+                                  except_func,
+                                  page=page, 
+                                  start_uid=start_uid)
+            if result:
+                self._process_page(result)
+            page += 1
+                            
+    def _process_page(self, content):
+        
+        soup = BeautifulSoup(content)
+        for i in soup.find_all('td',style='width: 52px'):
+            url = i.findChild('a').attrs.get('href')
+            if u"/u/" in url:
+                uid = re.findall(u'u/(\d{1,20})\??', url)[0]
+                #print uid
+            else:
+                uid = self._read_uid(url)
+                #print uid,"by read_uid"
+            if self.add_func:
+                self.add_func(uid)
+                logging.debug("Uid %s added" % uid)           
+    def _get_max(self, start_uid):
+        
+        url = self.fans_pc_url % (start_uid, "1")
+        except_func = lambda milktea,start_uid : logging.warning("url open error of uid %s @ get max page number, tried %s times!" % 
+                                     ( start_uid, milktea) )
+        result = retry_for_me(self.opener, 
+                              url,  
+                              except_func, 
+                              start_uid=start_uid)
+        if result:
+            return result
+        else:
+            return 1
+        
     def _read_uid(self, link ):
         logging.debug("Prasing uid from url : %s" % link)
         """read uid from a user's home page link"""      
@@ -254,7 +332,8 @@ class WeiboSpider(BaseSpider):
         user_info['home'] = re.findall('地区:(.*?)<br', html)[0]
         result = re.findall('标签:(.*?)更多', html)
         if result:
-            user_info['tags'] = ','.join(result[0].split())
+            soup = BeautifulSoup(result[0],'lxml')
+            user_info['tags'] = ','.join(soup.text.rsplit())
         if self.qb:
             self.qb.insert_userinfo(user_info)
         logging.debug("user info of %s inserted!" % uid) 
@@ -293,6 +372,15 @@ def test_fans():
     #print sp._get_max('1777981933') #test get_max
     sp.process_uid('1777981933', 5)
     
+def test_pc_fans():
+    username = 'winkidney@163.com'
+    pwd = '19921226'
+    cookie_file = 'weibo_login_cookies.dat'
+    cw_opener = weibopc_login.login(username, pwd, cookie_file)
+    sp = UIDProcesserPC(None, cw_opener)
+    return sp._get_max('1006061900353635')
+
 if __name__ == "__main__":
     #content,sp = test_single_user()
-    test_fans()
+    #test_fans()
+    result = test_pc_fans()

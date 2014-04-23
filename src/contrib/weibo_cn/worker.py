@@ -9,6 +9,8 @@ import threading
 import sys
 from time import sleep
 from random import randint
+from signal import signal, SIGTERM, SIGINT
+import atexit
 
 class WorkThread(threading.Thread):
 
@@ -26,8 +28,8 @@ class WorkThread(threading.Thread):
         
 
 
-def spwan_thread(uid):
-    qb = db.Querys('weibo_cn')
+def spwan_thread(uid, dbname):
+    qb = db.Querys(dbname)
     sp = WeiboSpider(qb, 'winkidney@163.com', '19921226', 'cookies.dat')
     sp.do_scrapy(uid)
     
@@ -38,11 +40,15 @@ def spwan_uider(uid,add_func):
     sp.after_scrapy()
     del sp
     
-def main(start_uid):
+def main(start_uid, dbname):
+    # Normal exit when killed
+    signal(SIGTERM, lambda signum, stackframe: sys.exit(1))
+    signal(SIGINT, lambda signum, stackframe: sys.exit(1))
     uid_list = []
     add_func = uid_list.append
     threads = []
     uider = WorkThread(spwan_uider.__name__,spwan_uider, start_uid, add_func)
+    uider.setDaemon(True)
     uider.start()
     sleep(10)
     done = False
@@ -51,7 +57,8 @@ def main(start_uid):
         if uid_list:
             if len(threads) < 5:
                 uid = uid_list.pop()
-                t = WorkThread(spwan_thread.__name__,spwan_thread, uid)
+                t = WorkThread(spwan_thread.__name__,spwan_thread, uid, dbname)
+                t.setDaemon(True)
                 threads.append(t)
                 t.start()
         for i in threads:
@@ -59,14 +66,15 @@ def main(start_uid):
                 threads.remove(i)
         if not threads:
             if not uider.isAlive():
-                if uid_list:
+                if not uid_list:
                     done = True
         sleep(20)
 
     print "all done!"
     
 if __name__ == "__main__":
-    if len(sys.argv) <2:
-        print "enter start_uid!"
-    else:
-        main(sys.argv[1])
+    if len(sys.argv) <3:
+        print "usage: worker.py uid dbname"
+    elif len(sys.argv) == 3:
+        main(sys.argv[1],sys.argv[2])
+
