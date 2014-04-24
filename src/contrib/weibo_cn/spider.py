@@ -163,9 +163,9 @@ class UIDProcesserPC(BaseSpider):
     def process_uid(self, start_uid, max):
         """get page and get fans's uid by prasing them"""
         logging.debug( "max number is: %s" % max)
-        page = 1
         # get a fans's page and than pass it to _process_page to get uids
-        while page <= max:
+        page = 1
+        while page <=max:
             url = self.fans_pc_url % (start_uid, page)
             logging.debug("Prasing url list from page %s, the url: %s" % (page, url))
             except_func = lambda milktea, start_uid, page: logging.warning( "[%s][ERROR]:url open error of uid %s @ page %s, tried %s times!" % \
