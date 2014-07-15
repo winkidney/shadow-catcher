@@ -1,4 +1,6 @@
 # own
+*.log
+L_*
 ref
 *.py[cod]
 *.settings
