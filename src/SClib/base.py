@@ -22,6 +22,7 @@ def write_file(filename, content):
     f.close()
     return
 
+    
 def build_opener(headers=None):
     #headers = {'User-Agent' : 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:27.0) Gecko/20100101 Firefox/27.0' }
     """
@@ -66,7 +67,8 @@ def retry_for_me(opener, url, sleep_time=0, except_func=None, fail_func=None, *a
     
 
 def get_logger():
-    
+    #todo 
+    #fix the multi-logger bug
     logging.basicConfig(level=logging.DEBUG,
                     format='[%(asctime)s ][%(thread)d][%(levelname)s] %(message)s',
                     datefmt='%a, %d %b %Y %H:%M:%S',
@@ -105,7 +107,8 @@ def get_month_days(year, month):
     if result:
         return leap_year[month-1]
     else:
-        return normal_year[month-1]   
+        return normal_year[month-1]
+
 
     
 if __name__ == "__main__":
