@@ -4,12 +4,13 @@
 #by winkidney@gmail.com 2014-07-15
 
 
-import sys,re,pyquery,os
+import re
+import pyquery
+import os
+import time
 
-sys.path.append('../..')
-from time import sleep
-from SClib import base
-from random import randint
+from shadow_catcher.SClib import base
+
 """
 import lib
 url style:
@@ -34,7 +35,7 @@ class Bilibili(object):
         
     def _open(self, url):
         
-        except_func = lambda url: self.logger.warning( "url open error of [%s], tried %s times!" % \
+        except_func = lambda milktea: self.logger.warning( "url open error of [%s], tried %s times!" % \
                             (url, milktea) )
         result = base.retry_for_me(opener = self.opener, 
                                    url = url, 
@@ -102,7 +103,54 @@ class Bilibili(object):
             #bug here, the logging will log  for 4 times!
             #todo : fix it
             self.logger.info("file %s writed!" % filename)
-        
+
+
+class AVInfo(object):
+
+    def __init__(self, timeout=5, data_dir='data'):
+        self.opener, self.cookie_jar = base.build_opener(cookiejar=self._login_cookie())
+        self.logger = base.get_logger()
+        self.timeout = timeout
+        self.data_dir = data_dir
+
+    def _login_cookie(self):
+        """
+            return a logined opener
+        """
+        import cookielib
+        if not os.path.isfile('cookies.txt'):
+            raise Exception('cookies.txt does not exist!')
+        return cookielib.MozillaCookieJar('cookies.txt')
+
+    def _write(self, filename, content):
+        base.write_file(os.path.join(self.data_dir, filename), content)
+
+    def _open(self, url):
+
+        except_func = lambda milktea: self.logger.warning("url open error of [%s], tried %s times!" %\
+                            (url, milktea))
+        result = base.retry_for_me(opener=self.opener,
+                                   url=url,
+                                   sleep_time=self.timeout,
+                                   except_func=except_func)
+        #print result
+        return result
+
+    def do_scrapy(self, task):
+
+        for av in task['avlist']:
+            try:
+                if not os.path.isfile(os.path.join(self.data_dir, av+'.html')):
+                    self._write(av+'.html', self._open('http://www.bilibili.com/video/%s/' % av))
+                    self.logger.info("file %s.html writed!" % av)
+                    #time.sleep(0)
+                else:
+                    self.logger.warning('file %s.html existed!' % av)
+                    return
+            except Exception as e:
+                self.logger.error("file %s.html error" % av)
+                continue
+
         
 def test():
     sp = Bilibili(5, 'L_data/')
@@ -112,7 +160,7 @@ def test():
     task['timeto'] = (2014, 7)
     sp.do_scrapy(task)
 
-    
+
 
 
 

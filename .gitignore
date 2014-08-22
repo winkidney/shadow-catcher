@@ -1,4 +1,9 @@
 # own
+csvdata
+data
+cookies*
+env
+*.sqlite
 *.log
 L_*
 ref

@@ -5,6 +5,7 @@
 
 
 from random import randint
+import uuid
 from time import sleep
 import socket
 import urllib, urllib2, cookielib
@@ -23,7 +24,7 @@ def write_file(filename, content):
     return
 
     
-def build_opener(headers=None):
+def build_opener(headers=None, cookiejar=None):
     #headers = {'User-Agent' : 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:27.0) Gecko/20100101 Firefox/27.0' }
     """
         build a browser-like opener ,
@@ -38,7 +39,10 @@ def build_opener(headers=None):
     addheaders = [('User-Agent', 
                    'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:27.0) Gecko/20100101 Firefox/27.0')
                   ]
-    cookie_jar = cookielib.LWPCookieJar()
+    if not cookiejar:
+        cookie_jar = cookielib.LWPCookieJar()
+    else:
+        cookie_jar = cookiejar
     opener = urllib2.build_opener(
             urllib2.HTTPCookieProcessor(cookie_jar), 
             urllib2.HTTPHandler()
@@ -66,7 +70,7 @@ def retry_for_me(opener, url, sleep_time=0, except_func=None, fail_func=None, *a
         fail_func(*args, **kwargs)
     
 
-def get_logger():
+def get_logger(name=None):
     #todo 
     #fix the multi-logger bug
     logging.basicConfig(level=logging.DEBUG,
@@ -80,7 +84,9 @@ def get_logger():
     c_logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('[%(asctime)s ][%(thread)d][%(levelname)s] %(message)s')
     c_logger.setFormatter(formatter)
-    logger = logging.getLogger('')
+    if not name:
+        name = str(uuid.uuid4())
+    logger = logging.getLogger(name)
     logger.addHandler(c_logger)
     return logger 
 

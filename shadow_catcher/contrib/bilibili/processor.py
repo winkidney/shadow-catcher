@@ -1,14 +1,12 @@
 #!/usr/local/bin/python2.7
 # encoding: utf-8
 '''
-src.contrib.bilibili.processor - process the existed html data.
+shadow_catcher.contrib.bilibili.processor - process the existed html data.
 
 @author:     winkidney
-
 '''
 
-import pyquery,os,csv
-
+import pyquery, os, csv
 
 
 class Processor(object):
@@ -57,17 +55,17 @@ class Processor(object):
                 author = video('.up').attr('href').split('/')[-1]
                 aitem = (av_code, played, stars, comments, title, author, date)
                 av_list.append(aitem)
-        except:
+        except Exception:
             return []
         return av_list
+
     def save_csv(self, total_list):
         f = open(self.csv_file, 'wb')
         c_writer = csv.writer(f, dialect='excel',
                                 )
         c_writer.writerow(('AV号', '播放次数', '收藏数', '弹幕数', '标题', 'up主', '日期'))
         c_writer.writerows(total_list)
-        
-    
+
     def run(self):
         file_list = os.listdir(self.root_dir)
         total_list = []
@@ -79,7 +77,8 @@ class Processor(object):
             print "[info] : %s processed!" % fname
         self.save_csv(total_list)
         print "%s saved!" % self.csv_file
-        
+
+
 def main():
     
     dir_list = os.listdir('L_data/')

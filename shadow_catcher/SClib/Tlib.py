@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 #coding:utf-8
 #worker.py - a worker processer fo spiders.
-
 import threading
 import sys
 from time import sleep
@@ -11,17 +10,18 @@ from signal import signal, SIGTERM, SIGINT
 
 class WorkThread(threading.Thread):
 
-    def __init__(self, name , func, *args, **kwargs):
-        super(WorkThread,self).__init__()
+    def __init__(self, name, func, *args, **kwargs):
+        super(WorkThread, self).__init__()
         self.name = name 
-        self.func = lambda : func(*args, **kwargs)
+        self.func = lambda: func(*args, **kwargs)
 
     def getResult(self):
         return self.res
 
     def run(self):
         self.res = self.func()
-        print "Thread ",self.name, ' completed!'
+        print "Thread ", self.name, ' completed!'
+        del self
 
     
 def Worker(producer, run_spider, thread_nums):
@@ -60,7 +60,7 @@ def Worker(producer, run_spider, thread_nums):
             if not producer.isAlive():
                 if not task_list:
                     done = True
-        sleep(3)
+        sleep(1)
 
     print "all done!"
 
