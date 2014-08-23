@@ -44,15 +44,17 @@ def Worker(producer, run_spider, thread_nums):
     sleep(3)
     done = False
     
-    while not done: 
-        if task_list:
-            if len(threads) < thread_nums:
+    while not done:
+        while 1:
+            if task_list and len(threads) < thread_nums:
                 task = task_list.pop()
                 t = WorkThread(run_spider.__name__, run_spider, task)
                 t.setDaemon(True)
                 threads.append(t)
                 t.start()
-            #print len(task_list),'\n'           #debug
+                print 'current threads number is : %s, task leave is : %s '% (len(threads), len(task_list))           #debug
+            else:
+                break
         for i in threads:
             if not i.isAlive():
                 threads.remove(i)
@@ -60,7 +62,7 @@ def Worker(producer, run_spider, thread_nums):
             if not producer.isAlive():
                 if not task_list:
                     done = True
-        sleep(1)
+        sleep(3)
 
     print "all done!"
 

@@ -38,16 +38,19 @@ def b_all_thread(task):
 
 
 def info_producer(add_func):
-    import time
+    import time, uuid
     count = 758200
     session = storage.get_session()
     #result_l = [av.split('.')[0] for av in os.listdir('data') ]
-    for i in range(196, count/1000+1):
-        result = session.query(storage.BVideo.av).all()[i*1000:(i+1)*1000]
+    result_all = sorted(session.query(storage.BVideo.av).all())
+    for i in range(0, count/1000+1):
+        result = result_all[i*1000:(i+1)*1000] 
         task = {}
         task['avlist'] = [av[0] for av in result]
+        taskid = uuid.uuid4
+        task['name'] = taskid
         add_func(task)
-        print "task %s added!" % i
+        print "task %s added!" % taskid
 
 
 def info_thread(task):

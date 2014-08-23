@@ -137,20 +137,21 @@ class AVInfo(object):
         return result
 
     def do_scrapy(self, task):
-
+        count = 0
         for av in task['avlist']:
             try:
                 if not os.path.isfile(os.path.join(self.data_dir, av+'.html')):
                     self._write(av+'.html', self._open('http://www.bilibili.com/video/%s/' % av))
-                    self.logger.info("file %s.html writed!" % av)
+                    if count%50 == 0:
+                        self.logger.info("50 files (ends with file %s.html) writed!" % av)
                     #time.sleep(0)
                 else:
-                    self.logger.warning('file %s.html existed!' % av)
-                    return
+                    #self.logger.warning('file %s.html existed!' % av)
+                    continue
             except Exception as e:
                 self.logger.error("file %s.html error" % av)
                 continue
-
+        self.logger.info('one task [%s] done!' % task['name'])
         
 def test():
     sp = Bilibili(5, 'L_data/')
