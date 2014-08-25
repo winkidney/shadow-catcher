@@ -47,7 +47,7 @@ def info_producer(add_func):
         result = result_all[i*1000:(i+1)*1000] 
         task = {}
         task['avlist'] = [av[0] for av in result]
-        taskid = uuid.uuid4
+        taskid = uuid.uuid4()
         task['name'] = taskid
         add_func(task)
         print "task %s added!" % taskid

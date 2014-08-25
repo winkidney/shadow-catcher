@@ -20,7 +20,7 @@ class WorkThread(threading.Thread):
 
     def run(self):
         self.res = self.func()
-        print "Thread ", self.name, ' completed!'
+        print "[SYS INFO] Thread ", self.name, ' completed!'
         del self
 
     
@@ -52,7 +52,7 @@ def Worker(producer, run_spider, thread_nums):
                 t.setDaemon(True)
                 threads.append(t)
                 t.start()
-                print 'current threads number is : %s, task leave is : %s '% (len(threads), len(task_list))           #debug
+                #print 'current threads number is : %s, task leave is : %s '% (len(threads), len(task_list))           #debug
             else:
                 break
         for i in threads:
@@ -62,6 +62,7 @@ def Worker(producer, run_spider, thread_nums):
             if not producer.isAlive():
                 if not task_list:
                     done = True
+        print 'current threads number is : %s, task leave is : %s '% (len(threads), len(task_list))           #debug
         sleep(3)
 
     print "all done!"

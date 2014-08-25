@@ -144,6 +144,7 @@ class AVInfo(object):
                     self._write(av+'.html', self._open('http://www.bilibili.com/video/%s/' % av))
                     if count%50 == 0:
                         self.logger.info("50 files (ends with file %s.html) writed!" % av)
+                    count += 1
                     #time.sleep(0)
                 else:
                     #self.logger.warning('file %s.html existed!' % av)
