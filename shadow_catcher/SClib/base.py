@@ -10,7 +10,7 @@ from time import sleep
 import socket
 import urllib, urllib2, cookielib
 import logging
-
+import gzip
 
 from config import DEAFULT_RETRY_TIMES as RETRY_TIMES
 from config import DEFAULT_TIMEOUT
@@ -68,7 +68,21 @@ def retry_for_me(opener, url, sleep_time=0, except_func=None, fail_func=None, *a
             sleep(randint(sleep_time,sleep_time+10))
     if fail_func:
         fail_func(*args, **kwargs)
-    
+
+
+def open_url(url, opener=None, timeout=5, logger=None):
+    if not opener:
+        opener, cookiejar = build_opener()
+    if not logger:
+        get_logger(str(uuid.uuid4()))
+    except_func = lambda milktea: logger.warning("url open error of [%s], tried %s times!" %\
+                            (url, milktea))
+    result = retry_for_me(opener=opener,
+                          url=url,
+                          sleep_time=timeout,
+                          except_func=except_func)
+    return result
+
 
 def get_logger(name=None):
     #todo 
@@ -116,6 +130,26 @@ def get_month_days(year, month):
         return normal_year[month-1]
 
 
-    
+def read_as_utf8(filename):
+    import sys
+    "return unicode object"
+    page_file = open(filename, 'rb')
+    try:
+        content = page_file.read().decode('utf-8')
+    except:
+        print "error decode on %s!" % filename
+        return None
+    page_file.close()
+    return content
+
+def ungz_as_utf8(filename):
+    page_file = open(filename, 'rb')
+    try:
+        data = gzip.GzipFile(fileobj=page_file).read()
+    except Exception as e:
+        data = page_file.read()
+        print "%s is not a gzip file, try normal reading!" % filename    
+    return data
+
 if __name__ == "__main__":
     pass

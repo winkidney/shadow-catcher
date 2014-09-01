@@ -21,8 +21,12 @@ DEFAULT_ENGINE = create_engine('sqlite:///bilibili.sqlite', echo=False)
 Base = declarative_base()
 
 
-def get_session():
-    Session = sessionmaker(bind=DEFAULT_ENGINE)
+def get_session(dbname=None):
+    if dbname:
+        engine = create_engine(dbname, echo=True, autoflush=False)
+    else:
+        engine = DEFAULT_ENGINE
+    Session = sessionmaker(bind=engine)
     return Session()
 
 class BVideo(Base):
@@ -37,7 +41,8 @@ class BVideo(Base):
     comments = Column(Integer, nullable=True,default=0)
     up_at = Column(DateTime, nullable=True)
     description = Column(Text)
-    tags = Column(Text)
+    tags = Column(String)
+    type = Column(String)
 
 
 
@@ -77,6 +82,43 @@ def import_data(csv_fname):
         loop += 1
     session.commit()
     print loop
+
+def convert_to_raw():
+    import cPickle
+    session = get_session()
+    b = BVideo
+    results = session.query(BVideo).values(b.av, b.title,b.up,
+                                           b.plays, b.stars, b.comments,
+                                           b.up_at,b.description,
+                                           b.tags, b.type)
+    total_dict = {}
+    for i in results:
+        video = {}
+        video['av'] = i[0]
+        video['title'] = i[1]
+        video['up'] = i[2]
+        video['plays'] = i[3]
+        video['stars'] = i[4]
+        video['comments'] = i[5]
+        video['up_at'] = i[6]
+        video['description'] = i[7]
+        video['tags'] = i[8]
+        video['type'] = i[9]
+        total_dict[video['av']] = video
+    encoded_dict = cPickle.dumps(total_dict)
+    f = open('raw_all.data', 'w')
+    f.write(encoded_dict)
+    return encoded_dict
+
+def rebuild_extraw(total_data):
+    import cPickle
+    results = cPickle.load(open('raw_asdict.data', 'r'))
+    for result in results:
+        dit = total_data[result['av']]
+        dit['tags'] = result['tags']
+        dit['description'] = result['description']
+        dit['type'] = result['type']
+    return total_data
 
 if __name__ == '__main__':
     create_table()

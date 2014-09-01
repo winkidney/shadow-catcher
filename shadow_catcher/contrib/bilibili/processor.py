@@ -5,9 +5,21 @@ shadow_catcher.contrib.bilibili.processor - process the existed html data.
 
 @author:     winkidney
 '''
-
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.expression import Insert
 import pyquery, os, csv
+from shadow_catcher.SClib.base import ungz_as_utf8
 
+def g_kw(kword):
+    kword = kword.replace("/", "//");  
+    kword = kword.replace("'", "''");  
+    kword = kword.replace("[", "/[");  
+    kword = kword.replace("]", "/]");  
+    kword = kword.replace("%", "/%");  
+    kword = kword.replace("&", "/&");
+    kword = kword.replace("_", "/_");  
+    kword = kword.replace("(", "/(");  
+    kword = kword.replace(")", "/)"); 
 
 class Processor(object):
     """
@@ -79,14 +91,130 @@ class Processor(object):
         print "%s saved!" % self.csv_file
 
 
-def main():
-    
-    dir_list = os.listdir('L_data/')
-    dir_list.remove('test')
-    for dir in dir_list:
-        p = Processor('L_data/'+dir+'/', dir+'.csv')
-        p.run()
+class ProcessAVInfo(object):
 
+    def __init__(self, flist, data_dir, csvname):
+        self.flist = flist
+        import sqlite3
+        self.con = sqlite3.connect('newbilibili.sqlite')
+        self.cur = self.con.cursor()
+        self.data_dir = data_dir
+        self.csv_file = csvname
+        
+    def process_one(self, content):
+        
+        pq = pyquery.PyQuery(content)
+        c_dict = {}
+        try:
+            c_dict['tags'] = pq('meta[name=keywords]').attr('content')
+            c_dict['description'] = pq('meta[name=description]').attr('content')
+            c_dict['av'] = self.av
+            c_dict['type'] = ','.join([ i.text for i in pq('.tminfo a[property="v:title"]') ])
+            return (c_dict['av'], c_dict['tags'], c_dict['description'], c_dict['type'])
+        except Exception as e:
+            print 'fail on %s prase' % self.av
+            return None
+         
+        #self._insert_row(c_dict)
+            
+    def read_file(self, filename):
+        
+        self.av = filename.split('.')[0]
+        filename = os.path.join(self.data_dir, filename)
+        return ungz_as_utf8(filename)
+        
+    def save_csv(self, total_list):
+        f = open(self.csv_file, 'wb')
+        c_writer = csv.writer(f, dialect='excel',
+                                quotechar='|',)
+        c_writer.writerow(('av', 'tags', 'description', 'type',))
+        c_writer.writerows(total_list)
+        
+    def _insert_row(self, c_dict):
+        query = """
+        UPDATE bilibili
+        SET tags=?, description=?, type=?
+        WHERE av=?;
+        """ % c_dict
+        #print query
+        self.cur.execute(query)
+        
+        
+    def run(self):
+        import cPickle
+        if not self.flist:
+            raise ValueError('flist argument must be a filepath list')
+        count  = 0
+        total = len(self.flist)
+        total_list = []
+        for f in self.flist:
+            result = self.process_one(self.read_file(f))
+            if result:
+                total_list.append(result)
+            count += 1
+            if count%100 == 0:
+                self.con.commit()
+                print "[info] %s/%s rows inserted!" % (count, total)
+        f_raw = cPickle.dumps(total_list)
+        open('fraw.data', 'w').write(f_raw)
+        self.save_csv(total_list)
+
+
+def convert_to_sqlite():
+    """
+    :type session : sqlalchemy.orm.session
+    :return:
+    """
+    import cPickle as Pickle
+    from storage import BVideo, get_session
+    session = get_session('sqlite:///newbilibili.sqlite')
+    data = Pickle.load(open('fraw.data', 'rb'))
+    count = 1
+    total = len(data)
+    for video in data:
+        #print video[0]
+        b = session.query(BVideo).filter_by(av=video[0]).first()
+        b.tags = video[1]
+        b.description = video[2]
+        b.type = video[3]
+        session.flush()
+        session.commit()
+        if count % 100 == 0:
+
+
+            print "[info] %(count)s/%(total)s inserted!" % {'count': count, 'total': total, }
+
+        count += 1
+
+
+@compiles(Insert)
+def append_string(insert, compiler, **kw):
+    s = compiler.visit_insert(insert, **kw)
+    if 'append_string' in insert.kwargs:
+        return s + " " + insert.kwargs['append_string']
+    return s
+
+
+def hex_buffer(buf):
+    retstr=''.join(map(lambda c:'\\x%02x'%ord(c),buf))
+    retstr="E'"+retstr+"'"
+    return retstr
+
+def insert_or_update():
+    import cPickle as Pickle
+    from sqlalchemy import create_engine
+    from storage import BVideo
+    engine_r = create_engine('sqlite:///bilibili.sqlite', echo=True)
+    engine_t = create_engine('sqlite://bilibili_per.sqlite')
+
+
+
+def main():
+    flist = os.listdir('data')
+    ProcessAVInfo(flist, 'data', 'bilibiliextend.csv')
+
+if __name__ == '__main__':
+    main()
 
 
 
