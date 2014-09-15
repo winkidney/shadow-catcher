@@ -3,7 +3,12 @@
 import pyquery
 import re
 
-fllow_regx = re.compile(r'"ns"\:"pl.content.followTab.index"(.*?)"html"\:(.*?)\}\)')
+follow_regx = re.compile(r'"ns"\:"pl.content.followTab.index"(.*?)"html"\:(.*?)\}\)')
+follow_link_regx = re.compile(r"page_id\']=\'(\d*?)\'\;")
+
+
+class ParseError(ValueError):
+    pass
 
 
 def wash(raw_text):
@@ -11,15 +16,33 @@ def wash(raw_text):
     wash the input strings .
     replace '\\t' with '\t', '\\n' with '\n'
     """
-    return raw_text.replace('\\r','\r').replace('\\n', '\n').replace('\\t', '\t').replace('\\', '')
+    text = raw_text.replace('\\r', '\r').replace('\\n', '\n').replace('\\t', '\t').replace('\\', '')
+    return text
 
 
-def prase_one(follow_html):
+def parse_one(raw_html):
     """
-    return (uid, nick_name) list by prasing follow_html text.
+    return (uid, nick_name) list by one weibo follow page's text.
     :type follow_html: str
     """
-    pq = pyquery.Pyquery(follow_html)
+    follow_html = wash(re.search(follow_regx, raw_html).group(2)[1:-1])
+
+    pq = pyquery.PyQuery(follow_html)
+    return pq
+
+
+def find_follow_pid(user_home_page):
+
+    return re.search(follow_link_regx, user_home_page).group(1)
+
+
+def parse_uids(pq_obj):
+    """
+    get uid list from a pyquery object.
+    :type pq_obj :pyqurey.PyQuery
+    :return (nickname, uid) list of given page
+    """
+    pq = pq_obj
     user_list = []
     for img in pq('div.face img'):
         uid = img.attrib.get('usercard').split('=')[-1]
@@ -27,14 +50,18 @@ def prase_one(follow_html):
         user_list.append((nickname, uid))
     return user_list
 
-def parse_from_js(raw_html):
-    """
-    Parse html text from raw js-included html.
-    :type raw_html: str
-    :param raw_html: raw html from source page.
-    :return pure html text of follow page.
-    """
-    return wash(re.search(follow_regx, raw_html).group(2)[1:-1])
+
+def get_page_max(pq_obj):
+    pq = pq_obj
+    if pq('[page-limited=true]'):
+        return 10
+    page_links = pq('a.page')
+    if page_links:
+        return len(page_links)
+    return 1
+
+
+
 
 
 

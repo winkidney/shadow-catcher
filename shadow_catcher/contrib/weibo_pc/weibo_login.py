@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 #coding=utf8
 #:
-'''
+"""
 Created on Mar 18, 2013
 Rewrite on Mar 09, 2014
 
 @author: yoyzhou
 @rewrite: winkidney
-'''
-
+"""
 
 import os
-import sys
 import urllib
 import urllib2
 import cookielib
@@ -23,12 +21,20 @@ import rsa
 import binascii
 
 
-
 """
 usage:
 main(username, password)
 return a opener of urllib2.
 """
+import logging
+
+
+HEADERS = [('User-Agent', 'Mozilla/5.0 (X11; Linux i686; rv:8.0) Gecko/20100101 Firefox/8.0'),
+           ('Host', 'weibo.com'),
+           ('Referer', 'http://weibo.com/')]
+HEADERS_DICT = {'User-Agent': 'Mozilla/5.0 (X11; Linux i686; rv:8.0) Gecko/20100101 Firefox/8.0',
+                'Host': 'weibo.com',
+                'Referer': 'http://weibo.com/'}
 
 
 class DataParseError(ValueError):
@@ -44,6 +50,7 @@ def get_pwd_wsse(pwd, servertime, nonce):
     pwd3_ = pwd2 + servertime + nonce
     pwd3 = hashlib.sha1(pwd3_).hexdigest()
     return pwd3
+
 
 def get_pwd_rsa(pwd, servertime, nonce):
     """
@@ -71,6 +78,7 @@ def get_user(username):
     username_ = urllib.quote(username)
     username = base64.encodestring(username_)[:-1]
     return username
+
 
 def get_prelogin_status(username):
     """
@@ -122,12 +130,11 @@ def do_login(username, pwd, cookie_file):
         'returntype': 'META'
         }
 
-    cookie_jar = cookielib.LWPCookieJar()
+    cookie_jar = cookielib.CookieJar()
     cookie_processor = urllib2.HTTPCookieProcessor(cookie_jar)
     opener = urllib2.build_opener(cookie_processor, urllib2.HTTPHandler)
     login_url = 'http://login.sina.com.cn/sso/login.php?client=ssologin.js(v1.4.5)'
     servertime, nonce, rsakv = get_prelogin_status(username)
-
 
     #Fill POST data
     login_data['servertime'] = servertime
@@ -137,11 +144,10 @@ def do_login(username, pwd, cookie_file):
     login_data['rsakv'] = rsakv
 
     form_data = urllib.urlencode(login_data)
-    headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux i686; rv:8.0) Gecko/20100101 Firefox/8.0'}
+    opener.addheaders = HEADERS
     login_req = urllib2.Request(
         url=login_url,
         data=form_data,
-        headers=headers
     )
     result = opener.open(login_req).read()
     redirect_regx = re.compile('replace\((.*?)\)')
@@ -162,8 +168,8 @@ def do_login(username, pwd, cookie_file):
 
     feedback_json = json.loads(feedback_data)
     if feedback_json['result']:
-        cookie_jar.save(cookie_file, ignore_discard=True, ignore_expires=True)
-        return opener
+        #cookie_jar.save(cookie_file, ignore_discard=True, ignore_expires=True)
+        return opener, cookie_jar
     else:
         raise ValueError("[info]feedback data parse error!Login failed!"
                          "feedback data is %s " % feedback_json)
@@ -186,28 +192,23 @@ def login(username, pwd, cookie_file):
             loaded = True
         except cookielib.LoadError:
             loaded = False
-            print '[info]Cookies not loaded'
+            logging.warning('[info]Cookies not loaded')
         
         #install loaded cookies for urllib2
         if loaded:
             cookie_processor = urllib2.HTTPCookieProcessor(cookie_jar)
             opener = urllib2.build_opener(cookie_processor, urllib2.HTTPHandler)
             #urllib2.install_opener(opener)
-            print '[info]Use existed cookies!'
+            logging.info('Use existed cookies!')
+            opener.addheaders = HEADERS
             return opener
         else:
-            print "[info] do real login, cookies files not found"
+            logging.info("[info] do real login, cookies files not found")
             return do_login(username, pwd, cookie_file)
     
     else:
-        print "[info]Cookie file does not existed, do real login now"
+        logging.info("[info]Cookie file does not existed, do real login now")
         return do_login(username, pwd, cookie_file)
-
-
-
-
-
-
 
 
 def main(username, password):
@@ -218,9 +219,9 @@ def main(username, password):
     """
     cookie_file = 'weibo_login_cookies.dat'
     cw_opener = login(username, password, cookie_file)
-    if cw_opener :
-        print 'Login WEIBO succeeded'
+    if cw_opener:
+        logging.info('WEIBO Login succeeded')
         return cw_opener
     else:
-        print 'Login WEIBO failed'
+        logging.info('WEIBO Login failed')
 

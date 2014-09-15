@@ -1,0 +1,1 @@
+celery -A proj worker -P eventlet -c 1000  --loglevel=info

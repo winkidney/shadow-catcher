@@ -7,6 +7,11 @@ here = os.path.abspath(os.path.dirname(__file__))
 requires = [
     'sqlalchemy',
     'pyquery',
+    'celery',
+    'redis',
+    'eventlet',
+    'greenlet',
+    'requests',
     ]
 
 setup(name='shadow-catcher',

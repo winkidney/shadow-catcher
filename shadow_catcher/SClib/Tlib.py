@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #coding:utf-8
-#worker.py - a worker processer fo spiders.
+#worker.py - a worker processer for spiders.
 import threading
 import sys
 from time import sleep
